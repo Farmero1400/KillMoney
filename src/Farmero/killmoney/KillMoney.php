@@ -6,6 +6,7 @@ namespace Farmero\killmoney;
 
 use pocketmine\plugin\PluginBase;
 use pocketmine\event\Listener;
+use pocketmine\event\entity\EntityDamageByEntityEvent;
 use pocketmine\event\entity\EntityDeathEvent;
 use pocketmine\player\Player;
 
@@ -17,27 +18,27 @@ class KillMoney extends PluginBase implements Listener {
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
     }
 
-    public function onPlayerKill(EntityDeathEvent $event): void {
+    public function onEntityDamageByEntity(EntityDamageByEntityEvent $event): void {
         $entity = $event->getEntity();
-        $cause = $entity->getLastDamageCause();
+        $damager = $event->getDamager();
 
-        if ($entity instanceof Player && $cause !== null && $cause->getDamager() instanceof Player) {
-            $victim = $entity;
-            $killer = $cause->getDamager();
-
-            $amountToTransfer = 100;
-
-            
-            $victimMoney = MoneySystem::getInstance()->getMoneyManager()->getMoney($victim);
-            if ($victimMoney < $amountToTransfer) {
-                $amountToTransfer = $victimMoney;
+        if ($entity instanceof Player && $damager instanceof Player) {
+            if ($entity->getHealth() - $event->getFinalDamage() <= 0) {
+                $this->handlePlayerKill($entity, $damager);
             }
-
-            MoneySystem::getInstance()->getMoneyManager()->removeMoney($victim, $amountToTransfer);
-            MoneySystem::getInstance()->getMoneyManager()->addMoney($killer, $amountToTransfer);
-
-            $victim->sendMessage("You lost $amountToTransfer money for being killed!");
-            $killer->sendMessage("You gained $amountToTransfer money for killing {$victim->getName()}!");
         }
+    }
+
+    private function handlePlayerKill(Player $victim, Player $killer): void {
+        $amountToTransfer = 100;
+
+        $victimMoney = MoneySystem::getInstance()->getMoneyManager()->getMoney($victim);
+        if ($victimMoney < $amountToTransfer) {
+            $amountToTransfer = $victimMoney;
+        }
+        MoneySystem::getInstance()->getMoneyManager()->removeMoney($victim, $amountToTransfer);
+        MoneySystem::getInstance()->getMoneyManager()->addMoney($killer, $amountToTransfer);
+        $victim->sendMessage("You lost $amountToTransfer money for being killed.");
+        $killer->sendMessage("You gained $amountToTransfer money for killing {$victim->getName()}.");
     }
 }
